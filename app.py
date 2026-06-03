@@ -1,6 +1,7 @@
 from flask import Flask, Response
 import requests
 import time
+import os
 
 app = Flask(__name__)
 
@@ -38,3 +39,7 @@ http://edge02-fdo-py.cvattv.com.ar/live/c5eds/TELEFUTURO_C4/verimatrix_rotating_
 @app.route("/")
 def index():
     return "OK"
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8888))
+    app.run(host="0.0.0.0", port=port)
