@@ -1,10 +1,9 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
-import re
-import json
+import os
+import time
 from datetime import datetime
 
-import os
 PORT = int(os.environ.get("PORT", 8888))
 ABC_VIDEO_ID = "x9skr3m"
 
@@ -15,16 +14,19 @@ HEADERS = {
 }
 
 TELEFUTURO_2 = "http://edge02-fdo-py.cvattv.com.ar/live/c5eds/TELEFUTURO_C4/verimatrix_rotating_FTA/TELEFUTURO_C4-video=3000000-audio_20000=144800.m3u8"
+TELEFUTURO_ALTA = "https://zn1tf.desdeparaguay.net/telefuturo/telefuturo_py_alta/playlist.m3u8"
+
+# Cache
+cache = {"m3u": None, "ts": 0}
+CACHE_TTL = 300  # 5 minutos
 
 
 def get_abc_url():
     try:
         api_url = f"https://www.dailymotion.com/player/metadata/video/{ABC_VIDEO_ID}?embedder=https://www.abc.com.py"
-        r = requests.get(api_url, headers=HEADERS, timeout=15)
+        r = requests.get(api_url, headers=HEADERS, timeout=10)
         data = r.json()
-
         qualities = data.get("qualities", {})
-        # Primero buscar calidad especifica, luego auto
         for quality in ["1080", "720", "480", "380", "240", "auto"]:
             if quality in qualities:
                 for item in qualities[quality]:
@@ -35,74 +37,57 @@ def get_abc_url():
     return None
 
 
-def get_telefuturo_url():
-    # URL de alta calidad directa
-    return "https://zn1tf.desdeparaguay.net/telefuturo/telefuturo_py_alta/playlist.m3u8"
-
-
 def build_m3u():
-    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Generando lista M3U...")
-
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Generando lista...")
     abc_url = get_abc_url()
-    if abc_url:
-        print(f"  ABC TV OK")
-    else:
-        abc_url = ""
-        print(f"  ABC TV FALLO")
-
-    tf_url = get_telefuturo_url()
-    print(f"  Telefuturo OK")
-
     m3u = "#EXTM3U\n"
-
     if abc_url:
         m3u += f'#EXTINF:-1 group-title="Paraguay",ABC TV\n{abc_url}\n'
-
-    m3u += f'#EXTINF:-1 group-title="Paraguay",Telefuturo HD\n{tf_url}\n'
+        print("  ABC TV OK")
+    else:
+        print("  ABC TV FALLO")
+    m3u += f'#EXTINF:-1 group-title="Paraguay",Telefuturo HD\n{TELEFUTURO_ALTA}\n'
     m3u += f'#EXTINF:-1 group-title="Paraguay",Telefuturo 2\n{TELEFUTURO_2}\n'
-
     return m3u
+
+
+def get_cached_m3u():
+    now = time.time()
+    if cache["m3u"] is None or (now - cache["ts"]) > CACHE_TTL:
+        cache["m3u"] = build_m3u()
+        cache["ts"] = now
+    return cache["m3u"]
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/canales.m3u":
-            m3u = build_m3u()
+            m3u = get_cached_m3u()
             content = m3u.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/x-mpegurl")
             self.send_header("Content-Length", str(len(content)))
             self.end_headers()
             self.wfile.write(content)
+        elif self.path == "/":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"Servidor de canales Paraguay OK")
         else:
             self.send_response(404)
             self.end_headers()
 
     def log_message(self, format, *args):
-        pass  # silenciar logs de requests
+        pass
 
 
-def get_local_ip():
-    import socket
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("8.8.8.8", 80))
-        return s.getsockname()[0]
-    finally:
-        s.close()
+print(f"Servidor iniciando en puerto {PORT}...")
 
-
-ip = get_local_ip()
-print("=" * 50)
-print("  SERVIDOR DE CANALES PARAGUAY")
-print("=" * 50)
-print(f"\n  URL para IPTV Smarters:")
-print(f"  http://{ip}:{PORT}/canales.m3u")
-print(f"\n  Copia esa URL en IPTV Smarters una sola vez.")
-print(f"  Cada vez que el Chromecast pida la lista,")
-print(f"  se obtienen URLs frescas automaticamente.")
-print("\n  Presiona Ctrl+C para detener.\n")
-print("=" * 50)
+# Pre-cargar cache al inicio
+cache["m3u"] = build_m3u()
+cache["ts"] = time.time()
+print("Cache cargado. Servidor listo.")
 
 server = HTTPServer(("0.0.0.0", PORT), Handler)
 server.serve_forever()
