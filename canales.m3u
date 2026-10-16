@@ -1,6 +1,6 @@
 #EXTM3U
 #EXTINF:-1 group-title="Paraguay",ABC TV
-
+https://cdndirector.dailymotion.com/cdn/live/video/x9skr3m.m3u8?sec=HjiM-00ZTKv9HQ2mMLoLAAGrVBRxWS77vSe4bH0WJURR53bqfYkBHTRlYwIxZ4CbB-cD6pJ5Ik6Zv1rWpj45PP2VQrLrceZH4p3JGUdxZlc&dmTs=268135&dmV1st=74539261D476CF8A73269F05F374223B
 #EXTINF:-1 group-title="Paraguay",Telefuturo HD
 https://zn1tf.desdeparaguay.net/telefuturo/telefuturo_py_alta/playlist.m3u8
 #EXTINF:-1 group-title="Paraguay",Telefuturo 2
